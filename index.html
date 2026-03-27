@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-width=1.0">
+    <title>Gaussian Splat Viewer</title>
+    <meta name="description" content="A 3D Gaussian Splatting viewer running completely in the browser.">
+    
+    <!-- Modern UI Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Import map for Three.js so we can use modern ES imports without a bundler -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+            "@mkkellogg/gaussian-splats-3d": "https://unpkg.com/@mkkellogg/gaussian-splats-3d@0.4.3/build/gaussian-splats-3d.module.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="loading" class="loading-overlay">
+        <div class="glass-box">
+            <div class="spinner"></div>
+            <p id="loading-text">Starte 3D Engine...</p>
+        </div>
+    </div>
+    
+    <!-- The canvas container where the viewer will be rendered -->
+    <div id="viewer-container"></div>
+
+    <!-- Application script -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
