@@ -18,9 +18,8 @@ async function initViewer() {
             'sharedMemoryForWorkers': false // Important for broad compatibility on GitHub Pages (CORS headers might restrict SharedArrayBuffer)
         });
 
-        // The URL of your FastAPI backend.
-        // Für lokale Entwicklung nehmen wir an, dass FastAPI auf Port 7860 läuft:
-        const modelUrl = 'http://localhost:7860/model.ply'; 
+        // The URL of your live FastAPI backend on Hugging Face Spaces.
+        const modelUrl = 'https://benjaminbleske-3dgs.hf.space/model.ply'; 
         // Falls deine Datei `model.splat` heißt, ändere dies zu `model.splat`.
         
         loadingText.innerText = `Lade Splat-Modell von FastAPI...`;
