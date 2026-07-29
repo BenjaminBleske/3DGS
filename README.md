@@ -1,24 +1,21 @@
-# 3D Gaussian Splat Web Viewer 🌌
+# 3D Gaussian Splat auf der Karte 🗺️
 
-Ein schneller, moderner 3D Gaussian Splatting Viewer, der vollständig im Browser über WebGL läuft.
+Ein Gaussian-Splat-Scan (SPZ-Format), georeferenziert auf einer echten [MapLibre GL JS](https://maplibre.org/)-Karte platziert (51.576594, 6.893350), inklusive Platzierung auf der tatsächlichen Geländehöhe (DGM).
 
 ## 🚀 Live Demo
-**[Hier klicken, um den 3D Gaussian Splat zu starten](https://BenjaminBleske.github.io/3DGS/)**
+**[Karte öffnen](https://BenjaminBleske.github.io/3DGS/)**
 
-*(Hinweis: Dieser URL funktioniert erst, sobald GitHub Pages in den Settings deines Repositories aktiviert wurde!)*
+*(Funktioniert, sobald GitHub Pages für diesen Branch/dieses Repo aktiviert ist.)*
 
-## 🏗️ Architektur
-Dieses Projekt ist für maximale Performance und Anpassungsfähigkeit strikt in zwei Ebenen separiert:
-
-1. **Frontend (GitHub Pages):** 
-   - Eine leichtgewichtige `index.html` + Vanilla JS Oberfläche, die auf der hochentwickelten Engine `@mkkellogg/gaussian-splats-3d` aufbaut.
-   - Es wird lokal oder rasend schnell über das globale CDN von GitHub Pages geladen.
-2. **Backend (Hugging Face Spaces):**
-   - Das massive (ca. 500MB+ große) `.ply` Splat-Modell ist vollständig ausgelagert und wird asynchron und progressiv von einem eigenen [Hugging Face Space](https://benjaminbleske-3dgs.hf.space) gestreamt.
-   - Gehostet über ein eigenes `FastAPI` / Docker Backend mit aktiver CORS-Verknüpfung.
+## 🏗️ Funktionsweise
+- `index.html` ist eine eigenständige Seite ohne Build-Schritt: [maplibre-gl](https://maplibre.org/maplibre-gl-js/) und das Plugin [maplibre-gl-splat](https://github.com/opengeos/maplibre-gl-splat) (auf Basis von [spark.js](https://sparkjs.dev/)) werden per CDN (jsDelivr ESM) geladen.
+- `avexport_30000.spz` ist der komprimierte Gaussian-Splat (SPZ-Format v3, gzip-komprimiert).
+- Beim Laden wird die reale Geländehöhe an der Zielposition aus einer öffentlichen Terrarium-Höhenkachel (AWS Open Data, `elevation-tiles-prod`) ausgelesen, damit der Splat auf Bodenhöhe statt auf Meereshöhe/0 sitzt.
 
 ## 🛠️ Lokale Entwicklung
-Möchtest du Anpassungen am UI oder WebGL-Viewer vornehmen?
-1. Klone das Repository: `git clone https://github.com/BenjaminBleske/3DGS.git`
-2. Starte im Ordner einen kleinen lokalen Webserver (z.B. Python: `python3 -m http.server 8080` oder NodeJS: `npm install -g http-server && http-server`).
-3. Öffne `http://localhost:8080/` in deinem Browser. Das Splat-Ladetool holt das Modell weiterhin live vom Hugging Face Server!
+1. Repository klonen: `git clone -b gaussian-splat-map https://github.com/BenjaminBleske/3DGS.git`
+2. Im Ordner einen kleinen lokalen Webserver starten, z. B. `python3 -m http.server 8080`
+3. `http://localhost:8080/` im Browser öffnen.
+
+## Hinweis zum Format
+Die Originaldatei wurde im neuen **SPZ-v4-Format** exportiert (ZSTD-komprimiert), das von aktuellen JS-Renderern noch nicht unterstützt wird. `avexport_30000.spz` in diesem Branch ist daher eine aus der Ursprungs-`.ply` neu erzeugte **SPZ-v3**-Datei (gzip-komprimiert), die mit `maplibre-gl-splat`/`spark.js` kompatibel ist.
