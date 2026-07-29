@@ -49,12 +49,32 @@
       console.error("Splat-Fehler:", event);
     });
 
+    // Echtes 3D-Terrain laden, damit die Kartenoberfläche selbst die
+    // Geländehöhe zeigt und der Splat sichtbar darauf steht statt über
+    // einer flachen Ebene zu schweben.
+    function setupTerrainLayer() {
+      try {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          tiles: [
+            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+          ],
+          tileSize: 256,
+          encoding: "terrarium",
+          maxzoom: TERRARIUM_ZOOM,
+        });
+        map.setTerrain({ source: "terrain-dem", exaggeration: 1 });
+      } catch (e) {
+        setTimeout(setupTerrainLayer, 200);
+      }
+    }
+    setupTerrainLayer();
+
     // Bodenhöhe (DGM) direkt aus einer Terrarium-Höhenkachel auslesen,
     // damit der Splat auf Geländehöhe statt auf Meereshöhe/0 sitzt.
-    // (MapLibres eingebautes queryTerrainElevation() + aktives 3D-Terrain
-    // führte in Kombination mit dem Splat-Layer zu einem leeren Canvas,
-    // daher wird die Höhe hier unabhängig aus der Rohkachel gelesen:
-    // https://github.com/tilezen/joerd, Terrarium-Encoding)
+    // (MapLibres eingebautes queryTerrainElevation() lieferte hier
+    // unzuverlässig 0, daher wird die Höhe unabhängig aus der Rohkachel
+    // gelesen: https://github.com/tilezen/joerd, Terrarium-Encoding)
     async function getTerrainElevation(lon, lat, zoom) {
       const latRad = (lat * Math.PI) / 180;
       const n = 2 ** zoom;
