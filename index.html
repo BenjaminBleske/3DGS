@@ -1,37 +1,121 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-width=1.0">
-    <title>Gaussian Splat Viewer</title>
-    <meta name="description" content="A 3D Gaussian Splatting viewer running completely in the browser.">
-    
-    <!-- Modern UI Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Import map for Three.js so we can use modern ES imports without a bundler -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
-            "@mkkellogg/gaussian-splats-3d": "https://unpkg.com/@mkkellogg/gaussian-splats-3d@0.4.3/build/gaussian-splats-3d.module.js"
-        }
-    }
-    </script>
+  <meta charset="utf-8" />
+  <title>Gaussian Splat auf der Karte</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl-splat@0.2.8/dist/maplibre-gl-splat.css" />
+  <style>
+    html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
+  </style>
 </head>
 <body>
-    <div id="loading" class="loading-overlay">
-        <div class="glass-box">
-            <div class="spinner"></div>
-            <p id="loading-text">Starte 3D Engine...</p>
-        </div>
-    </div>
-    
-    <!-- The canvas container where the viewer will be rendered -->
-    <div id="viewer-container"></div>
+  <div id="map"></div>
 
-    <!-- Application script -->
-    <script type="module" src="main.js"></script>
+  <script type="module">
+    import maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@4/+esm";
+    import { GaussianSplatControl } from "https://cdn.jsdelivr.net/npm/maplibre-gl-splat@0.2.8/+esm";
+
+    const LAT = 51.576594;
+    const LON = 6.893350;
+    const SPLAT_URL = "avexport_30000.spz";
+    const TERRARIUM_ZOOM = 15;
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      center: [LON, LAT],
+      zoom: 17,
+      pitch: 55,
+      maxPitch: 85,
+      antialias: true,
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-left");
+
+    const splatControl = new GaussianSplatControl({
+      collapsed: false,
+      defaultLongitude: LON,
+      defaultLatitude: LAT,
+      defaultScale: 1,
+      flyTo: true,
+      flyToZoom: 16,
+    });
+
+    map.addControl(splatControl, "top-right");
+
+    splatControl.on("error", (event) => {
+      console.error("Splat-Fehler:", event);
+    });
+
+    // Bodenhöhe (DGM) direkt aus einer Terrarium-Höhenkachel auslesen,
+    // damit der Splat auf Geländehöhe statt auf Meereshöhe/0 sitzt.
+    // (MapLibres eingebautes queryTerrainElevation() + aktives 3D-Terrain
+    // führte in Kombination mit dem Splat-Layer zu einem leeren Canvas,
+    // daher wird die Höhe hier unabhängig aus der Rohkachel gelesen:
+    // https://github.com/tilezen/joerd, Terrarium-Encoding)
+    async function getTerrainElevation(lon, lat, zoom) {
+      const latRad = (lat * Math.PI) / 180;
+      const n = 2 ** zoom;
+      const xtile = ((lon + 180) / 360) * n;
+      const ytile =
+        ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+      const x = Math.floor(xtile);
+      const y = Math.floor(ytile);
+      const px = Math.min(255, Math.floor((xtile - x) * 256));
+      const py = Math.min(255, Math.floor((ytile - y) * 256));
+
+      const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${zoom}/${x}/${y}.png`;
+      const img = await new Promise((resolve, reject) => {
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.onload = () => resolve(im);
+        im.onerror = reject;
+        im.src = url;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const [r, g, b] = ctx.getImageData(px, py, 1, 1).data;
+      return r * 256 + g + b / 256 - 32768;
+    }
+
+    getTerrainElevation(LON, LAT, TERRARIUM_ZOOM)
+      .then((elevation) => {
+        console.log("Geländehöhe (DGM) an Zielposition:", elevation, "m");
+        return splatControl.loadSplat(SPLAT_URL, {
+          longitude: LON,
+          latitude: LAT,
+          altitude: elevation,
+          scale: 1,
+        });
+      })
+      .then(() => {
+        console.log("Splat auf Geländehöhe geladen.");
+        // Nach dem Hinzufügen des Splat-Layers bleibt das Canvas manchmal
+        // leer, bis sich die Kamera-Transform tatsächlich ändert (reines
+        // triggerRepaint() reicht nicht - der Custom-WebGL-Layer bekommt
+        // erst bei einer echten Transform-Änderung frische Matrizen).
+        // Daher wird die Kamera ein paar Sekunden lang minimal (optisch
+        // nicht wahrnehmbar) hin- und herbewegt.
+        const z0 = map.getZoom();
+        const stopAt = performance.now() + 6000;
+        let toggle = false;
+        function pump() {
+          toggle = !toggle;
+          map.jumpTo({ zoom: z0 + (toggle ? 0.0002 : 0) });
+          if (performance.now() < stopAt) {
+            requestAnimationFrame(pump);
+          } else {
+            map.jumpTo({ zoom: z0 });
+          }
+        }
+        pump();
+      })
+      .catch((e) => console.error("Fehler beim Platzieren auf Geländehöhe:", e));
+  </script>
 </body>
 </html>
